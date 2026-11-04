@@ -29,6 +29,9 @@ button:focus-visible{outline:3px solid #ffd23f;outline-offset:2px}
 #acts #cDance{display:none}
 #acts.show #aGrab,#acts.show #aCopy,#acts.show #aPaint{display:none}
 #acts.show #cDance{display:block}
+ #acts #aSing{display:none;grid-column:span 2;background:#8a3cc8}
+ #acts.show #aSing{display:block}
+ #acts #aSing.hot{background:#ff4f8b}
 #dir{position:fixed;left:calc(8px + env(safe-area-inset-left,0px));top:calc(62px + env(safe-area-inset-top,0px));display:none;flex-direction:row;flex-wrap:wrap;gap:6px;z-index:5;width:236px}
 #dir button{flex:1 1 100px;font-size:8px;padding:6px}
 #dir button{opacity:.9}
@@ -68,7 +71,7 @@ body.port #dir{flex-direction:row;flex-wrap:wrap;justify-content:center;width:au
 <div id="top"><div class="tl"><div id="room"></div><div id="hint"></div></div>
 <div class="tb"><button id="bLook">Look</button><button id="bMusic">Music</button><button id="bSaves">Saves</button><button id="bShow">Start show</button></div></div>
 <div id="pad" aria-label="Move"><div id="knob"></div></div>
-<div id="acts"><button id="aGrab">Grab</button><button id="aJump">Jump</button><button id="aCopy">Copy</button><button id="aPaint">Paint</button><button id="cDance">Dance</button></div>
+<div id="acts"><button id="aGrab">Grab</button><button id="aJump">Jump</button><button id="aCopy">Copy</button><button id="aPaint">Paint</button><button id="cDance">Dance</button><button id="aSing">Sing</button></div>
 <div id="dir"><button id="cCam"></button><button id="cFocus"></button><button id="cFilter"></button><button id="cAuto"></button></div>
 <div id="msg"></div>
 <div id="ytbox"></div><div id="ytctl"><button id="ytPlay">Play</button><button id="ytPause">Pause</button><button id="ytTV">Put on screen</button><button id="ytx">Close</button></div>
@@ -323,7 +326,8 @@ var ROOMN={set:'The set',inst:'Instruments',band:'Band room',lights:'Lights and 
 var DOORS=[{r:'inst',x:44},{r:'band',x:96},{r:'lights',x:288},{r:'ward',x:340}];
 var st={screen:'builder',room:'set',setKind:'garage',scheme:0,show:false,fade:0,pending:null,
  p:{x:192,y:170,z:0,vz:0,dir:1,jumps:0,carry:null,anim:0,moving:false,dance:false},
- bpm:120,uz:1,beatT:0,beat:0,half:0,pulse:0,cam:{x:192,y:108,z:1},camMode:0,focus:0,filter:0,auto:false,spark:[],flash:0,msg:'',msgT:0};
+ bpm:120,uz:1,beatT:0,beat:0,half:0,pulse:0,cam:{x:192,y:108,z:1},camMode:0,focus:0,filter:0,auto:false,spark:[],flash:0,msg:'',msgT:0,
+ sing:{on:false,shape:null,hold:0,close:0,last:-1,noteT:0},notes:[]};
 var rooms={set:[],inst:[],band:[],lights:[],ward:[]};
 function seedRooms(){
   var inst=[['amp',44,150],['cab',100,146],['keys',150,152],['guitar',236,150],['kit',282,148],['mic',326,150]];
@@ -391,10 +395,11 @@ document.addEventListener('keydown',function(e){
   if(k===74||k===88){act('grab');}
   if(k===67){act('copy');}if(k===86){act('paint');}
   if(k===13){toggleShow();}if(k===71){act('dance');}
+  if(k===77){singStart();}
   if(k===70){cycleFilter(1);}if(k===81){cycleCam();}if(k===69){cycleFocus();}
   if(k>=37&&k<=40){e.preventDefault();}
 });
-document.addEventListener('keyup',function(e){keys[e.keyCode]=false;});
+document.addEventListener('keyup',function(e){keys[e.keyCode]=false;if(e.keyCode===77){singStop();}});
 
 /* ---------- helpers ---------- */
 function say(t){st.msg=t;st.msgT=1800;}
@@ -469,9 +474,36 @@ function cycleFilter(d){st.filter=(st.filter+d+FILTERS.length)%FILTERS.length;ui
 function toggleShow(){
   if(st.screen!=='studio'){return;}
   if(!st.show){if(st.room!=='set'){say('Head back to the set first');return;}st.show=true;st.beatT=0;st.beat=0;st.half=0;if(ytId&&screenRect()){ytOnTV=true;lastVid='';}if(ytId){ytPlay();}startMusic();}
-  else{st.show=false;stopBeat();st.camMode=0;if(ytId){ytPause();}}
+  else{st.show=false;stopBeat();st.camMode=0;if(ytId){ytPause();}singReset();}
   ui();
 }
+/* ---------- singing mouth ---------- */
+/* Each shape: [x offset from the head's mouth column, row offset from the mouth row, pixels]. K=outline D=inside r=tongue W=teeth */
+var MOUTHS={
+ ah:[[21,-1,' KKK '],[21,0,'KDDDK'],[21,1,'KDrDK'],[21,2,' KKK ']],
+ oh:[[21,-1,' KKK '],[21,0,'KDDDK'],[21,1,' KKK ']],
+ ee:[[21,-1,' KKK '],[21,0,'KWWWK'],[21,1,' KKK ']],
+ oo:[[22,-1,' K '],[22,0,'KDK'],[22,1,' K ']],
+ belt:[[20,-1,' KKKKK '],[20,0,'KDDDDDK'],[20,1,'KDrrrDK'],[20,2,' KKKKK ']]
+};
+var MOUTHN=['ah','oh','ee','oo','belt'];
+var MOUTHC={K:'#100a18',D:'#3a0a18',r:'#e05060',W:'#f4f4f4'};
+function singStart(){
+  if(st.screen!=='studio'||!st.show){return;}
+  var sg0=st.sing;if(sg0.on){return;}
+  var i;do{i=Math.floor(Math.random()*MOUTHN.length);}while(i===sg0.last);
+  sg0.last=i;sg0.shape=MOUTHN[i];sg0.on=true;sg0.hold=0;sg0.close=0;sg0.noteT=0;ui();
+}
+function singStop(){var sg0=st.sing;if(!sg0.on){return;}sg0.on=false;sg0.close=Math.max(0,140-sg0.hold);ui();}
+function singReset(){var sg0=st.sing;sg0.on=false;sg0.shape=null;sg0.close=0;st.notes=[];}
+function mouthOpen(){var sg0=st.sing;return st.show&&sg0.shape&&(sg0.on||sg0.close>0)?sg0.shape:null;}
+function drawMouth(lx,ly,frame){
+  var m=mouthOpen();if(!m){return;}
+  var y0=ly+14+(DATA.bob[frame]||0)+PAD;var rows=MOUTHS[m];
+  for(var r=0;r<rows.length;r++){var row=rows[r];
+    for(var j=0;j<row[2].length;j++){var ch=row[2].charAt(j);if(ch===' '){continue;}wg.fillStyle=MOUTHC[ch];wg.fillRect(lx+row[0]+j,y0+row[1],1,1);}}
+}
+function drawNote(x,y,c){x=Math.round(x);y=Math.round(y);wg.fillStyle=c;wg.fillRect(x,y,3,2);wg.fillRect(x+2,y-5,1,5);wg.fillRect(x+3,y-5,2,1);wg.fillRect(x+4,y-4,1,1);}
 function onBeat(){
   st.pulse=1;st.flash=1;
   if(st.auto&&st.beat%4===0){st.camMode=1+Math.floor(Math.random()*4);st.focus=Math.floor(Math.random()*focusList().length);ui();}
@@ -507,6 +539,12 @@ function update(dt){
     var hasDisco=false;for(var j=0;j<rooms.set.length;j++){if(rooms.set[j].k==='disco'){hasDisco=true;}}
     if(hasDisco&&Math.random()<0.6){st.spark.push({x:Math.random()*VW,y:Math.random()*FT*1.4,t:300});}
   }
+  var sgx=st.sing;
+  if(sgx.on){sgx.hold+=dt;
+    if(sgx.hold>300){sgx.noteT-=dt;if(sgx.noteT<=0){sgx.noteT=320;var fy=DATA.bob[leadFrame()]||0;
+      st.notes.push({x:p.x+p.dir*7,y:p.y-67-p.z+14+fy+PAD,vx:p.dir*(0.012+Math.random()*0.01),t:1400});}}}
+  else if(sgx.close>0){sgx.close-=dt;}
+  for(var nn=st.notes.length-1;nn>=0;nn--){var no=st.notes[nn];no.t-=dt;no.x+=no.vx*dt;no.y-=0.022*dt;if(no.t<=0){st.notes.splice(nn,1);}}
   for(var s=st.spark.length-1;s>=0;s--){st.spark[s].t-=dt;if(st.spark[s].t<=0){st.spark.splice(s,1);}}
   var fl=focusList();if(st.focus>=fl.length){st.focus=0;}var f=fl[st.focus];
   var T={x:192,y:108,z:1};
@@ -574,7 +612,7 @@ function drawWorld(){
       if(it===near){wg.fillStyle=S.b;wg.fillRect(it.x-2,it.y-50,5,1);wg.fillRect(it.x-1,it.y-49,3,1);}}
     else{var p=st.p;var fr=leadF[leadFrame()];var w=Math.max(6,12-Math.round(p.z/5));shadow(p.x,p.y,w);
       var lx=Math.round(p.x-24),ly=Math.round(p.y-67-p.z);
-      wg.save();if(p.dir<0){wg.translate(lx*2+48,0);wg.scale(-1,1);}wg.drawImage(fr,lx,ly);wg.restore();
+      wg.save();if(p.dir<0){wg.translate(lx*2+48,0);wg.scale(-1,1);}wg.drawImage(fr,lx,ly);drawMouth(lx,ly,leadFrame());wg.restore();
       if(p.carry){drawCarry(p.carry,p.x,ly+PAD+1);}}
   }
   if(st.show){
@@ -588,6 +626,7 @@ function drawWorld(){
     wg.restore();
   }
   for(i=0;i<st.spark.length;i++){var s=st.spark[i];wg.fillStyle=(s.t%120<60)?'#ffffff':S.b;wg.fillRect(Math.round(s.x),Math.round(s.y),1,1);if(s.t>200){wg.fillRect(Math.round(s.x)-1,Math.round(s.y),3,1);wg.fillRect(Math.round(s.x),Math.round(s.y)-1,1,3);}}
+  for(i=0;i<st.notes.length;i++){var nt=st.notes[i];if(nt.t>300||nt.t%120<60){drawNote(nt.x,nt.y,i%2?S.b:S.a);}}
   if(st.fade>0){wg.fillStyle='rgba(8,4,14,'+Math.min(1,st.fade+(st.pending?(st.fadeT||0)/220:0))+')';wg.fillRect(0,0,VW,VH);}
 }
 function present(){
@@ -768,10 +807,11 @@ function ui(){
   $('ytTV2').style.display=ytId?'inline-block':'none';$('ytTV2').textContent=ytOnTV?'Move to small player':'Put on screen';
   $('ytx').style.display=ytOnTV?'none':'block';
   $('cDance').className=st.p.dance?'hot':'';
+  $('aSing').className=st.sing.on?'hot':'';
 }
 function hintText(){
   if(st.screen!=='studio'){return '';}
-  if(st.show){return 'Direct the shot. You can still move, jump, and dance.';}
+  if(st.show){return 'Direct the shot. Tap Sing for mouth shapes, hold it for a long note.';}
   var p=st.p;
   if(p.y<FT+10){var nm=null;
     if(st.room==='set'){for(var d=0;d<DOORS.length;d++){if(Math.abs(p.x-DOORS[d].x)<14){nm=ROOMN[DOORS[d].r];}}}else if(Math.abs(p.x-192)<14){nm='the set';}
@@ -792,6 +832,13 @@ bindPress($('aCopy'),function(){act('copy');});
 bindPress($('aPaint'),function(){act('paint');});
 bindPress($('cDance'),function(){act('dance');ui();});
 bindPress($('bShow'),toggleShow);
+(function(){var b=$('aSing');var pid=null;
+  b.addEventListener('pointerdown',function(e){e.preventDefault();ac();pid=e.pointerId;try{b.setPointerCapture(pid);}catch(er){}singStart();});
+  function up(e){if(e.pointerId===pid){pid=null;singStop();}}
+  b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('lostpointercapture',up);
+  b.addEventListener('click',function(e){e.preventDefault();});
+  b.addEventListener('contextmenu',function(e){e.preventDefault();});
+})();
 bindPress($('bLook'),function(){openBuilder();});
 bindPress($('bMusic'),function(){$('saves').style.display='none';var m=$('music');m.style.display=m.style.display==='block'?'none':'block';ui();});
 bindPress($('mClose'),function(){$('music').style.display='none';});

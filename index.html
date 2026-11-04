@@ -157,26 +157,55 @@ function paintRows(id,w,h,rows,pal,dx,dy){
   for(var y=0;y<rows.length;y++){var yy=y+dy;if(yy<0||yy>=h){continue;}var r=rows[y];
     for(var x=0;x<r.length;x++){var ch=r.charAt(x);if(ch==='.'||ch===' '){continue;}var xx=x+dx;if(xx<0||xx>=w){continue;}var c=pal[ch];if(!c){continue;}var o=(yy*w+xx)*4;id.data[o]=c[0];id.data[o+1]=c[1];id.data[o+2]=c[2];id.data[o+3]=255;}}
 }
-function paintOv(id,w,h,lst,pal,dy){
-  for(var i=0;i<lst.length;i++){var it=lst[i];var x0=it[0],y0=it[1]+dy,s=it[2];if(y0<0||y0>=h){continue;}
+function paintOv(id,w,h,lst,pal,dy,dx){
+  for(var i=0;i<lst.length;i++){var it=lst[i];var x0=it[0]+(dx||0),y0=it[1]+dy,s=it[2];if(y0<0||y0>=h){continue;}
     for(var j=0;j<s.length;j++){var ch=s.charAt(j);if(ch===' '){continue;}var xx=x0+j;if(xx<0||xx>=w){continue;}var c=pal[ch];if(!c){continue;}var o=(y0*w+xx)*4;id.data[o]=c[0];id.data[o+1]=c[1];id.data[o+2]=c[2];id.data[o+3]=255;}}
 }
 var PAD=8;
-function paintSkirt(id,pal,bob){
-  for(var r=0;r<12;r++){var y=35+r+bob;var e=r<2?0:Math.floor((r-1)/2);var x0=16-e,x1=32+e;
+/* ---------- generated dance + solo frames ---------- */
+function genMoves(){
+  DATA.dx=DATA.dx||{};
+  function sh(s,n){if(n>0){return new Array(n+1).join('.')+s.substr(0,s.length-n);}if(n<0){return s.substr(-n)+new Array(-n+1).join('.');}return s;}
+  function blank(){return new Array(49).join('.');}
+  for(var o in DATA.bodies){var B=DATA.bodies[o];
+    var mk2=function(base,pre){var b=B[base],r,i,out;
+      /* one arm up: keep this side, borrow the raised arm from dance0 */
+      out=[];for(r=0;r<b.length;r++){out.push(r<41?b[r].substr(0,33)+B.dance0[r].substr(33):b[r]);}B[pre+'Up']=out;
+      /* sway: upper body leans one pixel over planted feet */
+      for(var d=-1;d<=1;d+=2){out=[];for(r=0;r<b.length;r++){out.push(r<41?sh(b[r],d):b[r]);}B[pre+(d<0?'SwL':'SwR')]=out;}
+      /* step: legs from the walk cycle */
+      var wk=['walk0','walk2'];for(i=0;i<2;i++){out=[];for(r=0;r<b.length;r++){out.push(r<42?b[r]:B[wk[i]][r]);}B[pre+(i?'StB':'StA')]=out;}
+      /* crouch: bend the knees two pixels */
+      out=[blank(),blank()];for(r=0;r<b.length;r++){if(r===43||r===44){continue;}out.push(b[r]);}B[pre+'Cr']=out.slice(0,b.length);
+    };
+    mk2('mic0','m');mk2('idle0','f');
+    /* guitar solo: slide the fretting hand along the neck */
+    var g=B.gtr0;
+    if(g){var ks=[-2,-1,1,2];for(var q=0;q<ks.length;q++){var k=ks[q];var rows=g.slice();var hand=[];
+      for(var rr=22;rr<=28;rr++){for(var c=39;c<48;c++){var ch=g[rr].charAt(c);if(ch!=='.'){hand.push([rr,c,ch]);rows[rr]=rows[rr].substr(0,c)+'.'+rows[rr].substr(c+1);}}}
+      for(var h=0;h<hand.length;h++){var y=hand[h][0]-k,x=hand[h][1]+k;if(x<0||x>47){continue;}rows[y]=rows[y].substr(0,x)+hand[h][2]+rows[y].substr(x+1);}
+      B['gS'+(k<0?'m':'p')+Math.abs(k)]=rows;}}
+  }
+  var gb=['Up','StA','StB'];for(var i=0;i<gb.length;i++){DATA.bob['m'+gb[i]]=0;DATA.bob['f'+gb[i]]=0;}
+  DATA.bob.mSwL=DATA.bob.mSwR=DATA.bob.fSwL=DATA.bob.fSwR=0;DATA.dx.mSwL=DATA.dx.fSwL=-1;DATA.dx.mSwR=DATA.dx.fSwR=1;
+  DATA.bob.mCr=DATA.bob.fCr=2;DATA.bob.gSm2=DATA.bob.gSm1=DATA.bob.gSp1=DATA.bob.gSp2=0;
+}
+genMoves();
+function paintSkirt(id,pal,bob,dx){dx=dx||0;
+  for(var r=0;r<12;r++){var y=35+r+bob;var e=r<2?0:Math.floor((r-1)/2);var x0=16-e+dx,x1=32+e+dx;
     for(var x=x0;x<=x1;x++){var c=(r===11||x===x0||x===x1)?pal.K:(x<=x0+2?pal.U:(x>=x1-3?pal.t:pal.T));var o=(y*48+x)*4;id.data[o]=c[0];id.data[o+1]=c[1];id.data[o+2]=c[2];id.data[o+3]=255;}}
 }
 function buildChar(L){
   var pal=charPal(L);var out={};var body=DATA.bodies[L.outfit];
   for(var name in body){
-    var cv=mk(48,68);var x=cv.getContext('2d');var id=x.createImageData(48,68);var bob=DATA.bob[name]+PAD;
-    if(L.wings){paintOv(id,48,68,DATA.wings,pal,bob);}
-    paintOv(id,48,68,DATA.hair[HAIRS[L.hairStyle]].back,pal,bob);
+    var cv=mk(48,68);var x=cv.getContext('2d');var id=x.createImageData(48,68);var bob=DATA.bob[name]+PAD;var bx=DATA.dx[name]||0;
+    if(L.wings){paintOv(id,48,68,DATA.wings,pal,bob,bx);}
+    paintOv(id,48,68,DATA.hair[HAIRS[L.hairStyle]].back,pal,bob,bx);
     paintRows(id,48,68,body[name],pal,0,PAD);
-    paintOv(id,48,68,DATA.hair[HAIRS[L.hairStyle]].front,pal,bob);
-    if(L.dress){paintSkirt(id,pal,bob);paintOv(id,48,68,[[22,14,'rrr']],pal,bob);}
-    paintOv(id,48,68,DATA.face[FACES[L.face]],pal,bob);
-    if(L.hat&&L.hat!=='none'){paintOv(id,48,68,DATA.hat[L.hat],pal,bob);}
+    paintOv(id,48,68,DATA.hair[HAIRS[L.hairStyle]].front,pal,bob,bx);
+    if(L.dress){paintSkirt(id,pal,bob,bx);paintOv(id,48,68,[[22,14,'rrr']],pal,bob,bx);}
+    paintOv(id,48,68,DATA.face[FACES[L.face]],pal,bob,bx);
+    if(L.hat&&L.hat!=='none'){paintOv(id,48,68,DATA.hat[L.hat],pal,bob,bx);}
     x.putImageData(id,0,0);out[name]=cv;
   }
   return out;
@@ -530,10 +559,10 @@ function mouthFor(who,n){
 }
 function drawMouth(lx,ly,frame,m,fr){
   if(!m){return;}
-  var y0=ly+14+(DATA.bob[frame]||0)+PAD;var rows=MOUTHS[m];
+  var y0=ly+14+(DATA.bob[frame]||0)+PAD;var rows=MOUTHS[m];var mdx=DATA.dx[frame]||0;
   for(var r=0;r<rows.length;r++){var row=rows[r];
-    for(var j=0;j<row[2].length;j++){var ch=row[2].charAt(j);if(ch===' '){continue;}wg.fillStyle=MOUTHC[ch];wg.fillRect(lx+row[0]+j,y0+row[1],1,1);}}
-  if(frame==='mic0'||frame==='mic1'){var my=14+(DATA.bob[frame]||0)+PAD;wg.drawImage(fr,18,my,6,3,lx+18,ly+my,6,3);}
+    for(var j=0;j<row[2].length;j++){var ch=row[2].charAt(j);if(ch===' '){continue;}wg.fillStyle=MOUTHC[ch];wg.fillRect(lx+row[0]+j+mdx,y0+row[1],1,1);}}
+  if(isMicF(frame)){var my=14+(DATA.bob[frame]||0)+PAD;wg.drawImage(fr,18+mdx,my,6,3,lx+18+mdx,ly+my,6,3);}
 }
 /* handheld mic for the lead when he is moving, jumping or dancing */
 function drawHandMic(lx,ly,frame){
@@ -562,7 +591,9 @@ function memIndex(k){return BAND.indexOf(k);}
 function drawMember(it){
   var m=MEMBERS[it.k];var fn=memFrame(it);var f=memF[it.k][fn];var sw=0;
   if(m.part&&st.show&&st.room==='set'){var ph=performance.now()/(60000/st.bpm)*Math.PI/2;sw=Math.round(Math.sin(ph+memIndex(it.k))*(m.part==='keys'?1:2));}
-  var lx=Math.round(it.x-24+sw),ly=Math.round(it.y-67);
+  if(st.show&&st.jam===it){var ph2=performance.now()/(60000/st.bpm)*Math.PI;sw=Math.round(Math.sin(ph2/2)*2);}
+  var jy=(st.show&&st.jam===it&&st.half%2===0)?-1:0;
+  var lx=Math.round(it.x-24+sw),ly=Math.round(it.y-67+jy);
   shadow(it.x,it.y,12);wg.drawImage(f,lx,ly);
   if(st.show&&st.room==='set'){drawMouth(lx,ly,fn,mouthFor(it.k,memIndex(it.k)),f);}
   if(m.part&&st.room==='set'){
@@ -623,7 +654,16 @@ function update(dt){
     if(st.camMode===3){T={x:192+Math.sin(performance.now()/2400)*120,y:120,z:1.7};}
     if(st.camMode===4){T={x:192,y:108,z:1+st.pulse*0.16};}
   }
+  /* singing with the mic: camera slowly pans in; a nearby guitarist or bassist joins the shot */
+  if(st.show&&p.mic&&SING.lead.on){st.spotT=1400;}else if(st.spotT>0){st.spotT-=dt;}
+  st.jam=null;
+  if(st.show&&st.spotT>0){var bd2=1e9;for(var jj=0;jj<rooms.set.length;jj++){var jo=rooms.set[jj];
+      if(jo.t==='mem'&&(MEMBERS[jo.k].role==='guitar'||MEMBERS[jo.k].role==='bass')){var ddx=Math.abs(jo.x-p.x),ddy=Math.abs(jo.y-p.y);if(ddx<60&&ddy<30&&ddx+ddy<bd2){bd2=ddx+ddy;st.jam=jo;}}}
+    if(st.jam){T={x:(p.x+st.jam.x)/2,y:(p.y+st.jam.y)/2-38-p.z/2,z:1.9};}else{T={x:p.x,y:p.y-40-p.z,z:2.2};}
+    st.jamNoteT=(st.jamNoteT||0)-dt;
+    if(st.jam&&st.jamNoteT<=0){st.jamNoteT=240;var jr=MEMBERS[st.jam.k].role;st.notes.push({x:st.jam.x+(jr==='guitar'?14:12),y:st.jam.y-(jr==='guitar'?44:40),vx:0.02+Math.random()*0.012,t:1200});}}
   var c=st.cam;var k=st.camMode===4?1:Math.min(1,dt*0.005);
+  if(st.show&&st.spotT>0){k=Math.min(1,dt*0.0016);}
   c.x+=(T.x-c.x)*k;c.y+=(T.y-c.y)*k;c.z+=(T.z-c.z)*k;
 }
 
@@ -632,17 +672,26 @@ var screen=document.getElementById('scr');var sg=screen.getContext('2d');
 var world=mk(VW,VH);var wg=world.getContext('2d');
 sg.imageSmoothingEnabled=false;wg.imageSmoothingEnabled=false;
 function shadow(x,y,w){wg.fillStyle='rgba(0,0,0,0.35)';x=Math.round(x);y=Math.round(y);wg.fillRect(x-w+2,y-1,w*2-4,1);wg.fillRect(x-w,y,w*2,2);wg.fillRect(x-w+2,y+2,w*2-4,1);}
+/* dance moves; the 'm' set never moves the arm holding the mic. They change every 8 beats. */
+var MOVES={m:[['mic0','mUp'],['mSwL','mSwR'],['mStA','mStB'],['mCr','mic0'],['mUp','mCr']],
+ f:[['dance0','dance1'],['fSwL','fSwR'],['fStA','fStB'],['fUp','fCr'],['idle0','fCr']]};
+function isMicF(f){return f.charAt(0)==='m';}
 function leadFrame(){
   var p=st.p;var c=!!p.carry;
   if(p.z>0||p.jumps>0){return c?'cjump':'jump';}
   if(p.moving){var i=Math.floor(p.anim/120)%4;return c?['cwalk0','cwalk1','cwalk2','cwalk1'][i]:['walk0','walk1','walk2','walk3'][i];}
   if(p.mic&&!c&&!p.dance){return (st.show?st.beat%2:Math.floor(p.anim/520)%2)?'mic1':'mic0';}
-  if(p.dance&&!c){if(st.show){return st.beat%2?'dance1':'dance0';}return Math.floor(p.anim/250)%2?'dance1':'dance0';}
+  if(p.dance&&!c){var mvs=MOVES[p.mic?'m':'f'];var mv,ph;
+    if(st.show){mv=Math.floor(st.beat/8)%mvs.length;ph=st.beat%2;}else{mv=Math.floor(p.anim/4000)%mvs.length;ph=Math.floor(p.anim/300)%2;}
+    return mvs[mv][ph];}
   if(c){return 'cidle';}
   return Math.floor(p.anim/520)%2?'idle1':'idle0';
 }
 function memFrame(it){
   var m=MEMBERS[it.k];var fr=ROLEF[m.role];
+  if(st.show&&st.jam===it){var s16=st.half*2+(st.beatT>=30000/st.bpm/2?1:0);
+    if(m.role==='guitar'){var SOLO=[['gtr0','gSp1','gSp2','gSp1','gtr1','gSm1','gSm2','gSm1'],['gSp2','gtr0','gSm2','gtr1','gSp1','gSm1','gSp2','gtr0']];return SOLO[Math.floor(st.beat/4)%2][s16%8];}
+    return fr[s16%2];}
   if(m.part){if(st.room==='set'&&st.show){if(m.part==='tamb'){return st.beat%2?'idle0':'dance0';}return m.part==='keys'?(st.half%2?'idle1':'idle0'):(st.beat%2?'idle1':'idle0');}
     return Math.floor((performance.now()+it.x*7)/520)%2?'idle1':'idle0';}
   if(st.room==='set'){
@@ -683,7 +732,7 @@ function drawWorld(){
       if(it===near){wg.fillStyle=S.b;wg.fillRect(it.x-2,it.y-50,5,1);wg.fillRect(it.x-1,it.y-49,3,1);}}
     else{var p=st.p;var fr=leadF[leadFrame()];var w=Math.max(6,12-Math.round(p.z/5));shadow(p.x,p.y,w);
       var lx=Math.round(p.x-24),ly=Math.round(p.y-67-p.z);
-      wg.save();if(p.dir<0){wg.translate(lx*2+48,0);wg.scale(-1,1);}var lf=leadFrame();wg.drawImage(fr,lx,ly);if(st.show){drawMouth(lx,ly,lf,mouthFor('lead',0),fr);}if(p.mic&&lf!=='mic0'&&lf!=='mic1'){drawHandMic(lx,ly,lf);}wg.restore();
+      wg.save();if(p.dir<0){wg.translate(lx*2+48,0);wg.scale(-1,1);}var lf=leadFrame();wg.drawImage(fr,lx,ly);if(st.show){drawMouth(lx,ly,lf,mouthFor('lead',0),fr);}if(p.mic&&!isMicF(lf)){drawHandMic(lx,ly,lf);}wg.restore();
       if(p.carry){drawCarry(p.carry,p.x,ly+PAD+1);}}
   }
   if(st.show){
